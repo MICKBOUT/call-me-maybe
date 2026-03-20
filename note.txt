@@ -1,0 +1,8 @@
+for function name:
+
+model: lst of function lst + description
+[name = fn_add_number, description = add two number], [name = get_sqrt_root, description = get the sqrt root of a number]
+
+for arguments:
+model: function_name + description + arg 1: int = 
+[name = "fn_add_number", "description" = "add two number", parameter = [int a = "..., int b "]

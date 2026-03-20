@@ -2,6 +2,7 @@ import json
 import numpy as np
 
 from llm_sdk.llm_sdk import Small_LLM_Model
+# from tree_visualizer import build_rich_tree_fn
 
 
 class custom_llm(Small_LLM_Model):
@@ -11,6 +12,11 @@ class custom_llm(Small_LLM_Model):
         # loading json
         with open(function_path, 'r') as f:
             self.fn_lst = json.load(f)
+
+        self.dict_function = {}
+        for d in self.fn_lst:
+            self.dict_function[d["name"]] = d
+        # build_rich_tree_fn(self.dict_function)
 
         self.fn_dict = {}
         for fn in self.fn_lst:
@@ -49,9 +55,9 @@ class custom_llm(Small_LLM_Model):
         return self.decode(res_token)
 
     def find_function_name(self, request: str):
-        request_str = '{"prompte": "' + \
+        request_str = '{"prompt": "' + \
             request + \
-            '",\n "name": "'
+            '", "name": "'
         encoded_Tensor = self.encode(request_str)
         self.encoded_json = encoded_Tensor.tolist()[0]
 
@@ -60,35 +66,46 @@ class custom_llm(Small_LLM_Model):
     def find_parameter(self, request: str, function_name: str):
         parameters_lst = [
             list(ell["parameters"].keys()) for ell in self.fn_lst
-            if ell["name"] == "fn_add_numbers"][0]
+            if ell["name"] == function_name][0]
 
-        request_str = '{' + \
-            f'"prompte": "{request}",' + \
-            f'"name": "{function_name}",' + \
+        request_str = ', {' + \
+            f'"prompt": "{request}", ' + \
+            f'"name": "{function_name}", ' + \
             '"parameters": {'
+        encode_request = self.encode(request_str).tolist()[0]
+        return_dict = {}
+        encoded_function = self.encode(str(self.dict_function[function_name])).tolist()[0]
 
+        encoded_arg_name = []
         for parameter in parameters_lst:
-            res_token = self.encode(f'"{parameter}": "').tolist()[0]
-            ids = -1
-            encode_request = self.encode(request_str).tolist()[0]
-            while "}" not in self.decode(res_token[-1]):
-                ids = -1
+            res_token = []
+            encoded_arg_name += self.encode(f'"{parameter}": ').tolist()[0]
+            while True:
+                print("========== \n Request:\n", self.decode(encoded_function + encode_request + encoded_arg_name + res_token))
                 lst_proba = self.get_logits_from_input_ids(
-                    self.function_encoded + encode_request + res_token)
+                    encoded_function + encode_request + encoded_arg_name + res_token)
                 ids = int(np.argmax(lst_proba))
-                if ids == 1:  # break if the next char is " (end of json)
+                print("res:\n", self.decode(ids))
+                ids_decodes = self.decode(ids)
+                if "}" in ids_decodes:
+                    if ids_decodes[0] != "}":
+                        res_token += self.encode(ids_decodes[0]).tolist()[0]
+                    break
+                elif "," in ids_decodes:
+                    if ids_decodes[0] != ",":
+                        res_token += self.encode(ids_decodes[0]).tolist()[0]
                     break
                 res_token.append(ids)
-            break
-        return llm.decode(res_token)
+            if parameter != parameters_lst[-1]:
+                encoded_arg_name += res_token + self.encode(", ").tolist()[0]
+            else:
+                encoded_arg_name += res_token + self.encode("}").tolist()[0]
+            return_dict[parameter] = self.decode(res_token)
+        return return_dict
+
+
 llm = custom_llm()
 
-
-# print(llm.fn_lst)
-
-# print([list(ell["parameters"].keys()) for ell in llm.fn_lst if ell["name"] == "fn_add_numbers"][0])
-# for ell in llm.fn_lst:
-#     print(ell["parameters"])
 path_prompt = "data/input/function_calling_tests.json"
 with open(path_prompt, 'r') as f:
     prompt_dict = json.load(f)
@@ -98,17 +115,18 @@ result = []
 for prompt_data in prompt_dict:
     name = llm.find_function_name(request=prompt_data["prompt"])
     param = llm.find_parameter(prompt_data["prompt"], name)
+    print(param)
+    arg_param = {}
     result.append({
         "prompt": prompt_data["prompt"],
         "name": name,
         "parameters": param
     })
     print(result[-1])
-    break
 
 
 
 
-# output_file = "data/output/function_calling_results.json"
-# with open(output_file, "w") as f:
-#     json.dump(result, f, indent=4)
+output_file = "data/output/function_calling_results_test_2.json"
+with open(output_file, "w") as f:
+    json.dump(result, f, indent=4)
