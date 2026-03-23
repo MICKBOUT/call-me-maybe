@@ -111,7 +111,7 @@ class custom_llm(Small_LLM_Model):
                     break
                 res_token.append(ids)
             if parameter != parameters_lst[-1]:
-                encoded_arg_name += res_token + self.encode("\n").tolist()[0]
+                encoded_arg_name += res_token + tokenize_back_n
             return_dict[parameter] = self.decode(res_token)
         for key, val in return_dict.items():
             val = val.strip()
@@ -126,6 +126,7 @@ class custom_llm(Small_LLM_Model):
 
 
 llm = custom_llm()
+tokenize_back_n = llm.encode("\n").tolist()[0]
 
 path_prompt = "data/input/function_calling_tests.json"
 with open(path_prompt, 'r') as f:
