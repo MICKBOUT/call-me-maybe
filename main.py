@@ -63,44 +63,65 @@ class custom_llm(Small_LLM_Model):
 
         return self.find_next_ell(self.fn_dict, request_str)
 
+    def readable_function(self, function_name: str) -> str:
+        fn_used = self.dict_function[function_name]
+        res = "Fn:\n"
+        res += f'  Name: {fn_used["name"]}\n'
+        res += f'  Description: {fn_used["description"]}\n'
+        res += '  Parameters info:\n'
+        for key, val in fn_used["parameters"].items():
+            res += f"    {key}: {val['type']}\n"
+        res += "\n"
+        return res
+
     def find_parameter(self, request: str, function_name: str):
         parameters_lst = [
             list(ell["parameters"].keys()) for ell in self.fn_lst
             if ell["name"] == function_name][0]
 
-        request_str = ', {' + \
-            f'"prompt": "{request}", ' + \
-            f'"name": "{function_name}", ' + \
-            '"parameters": {'
+        encoded_fn_info = self.encode(
+            self.readable_function(function_name)).tolist()[0]
+        request_str = f"Prompt = {request}\n" +\
+            "  Parameters:\n"
         encode_request = self.encode(request_str).tolist()[0]
-        return_dict = {}
-        encoded_function = self.encode(str(self.dict_function[function_name])).tolist()[0]
 
+        return_dict = {}
         encoded_arg_name = []
         for parameter in parameters_lst:
             res_token = []
-            encoded_arg_name += self.encode(f'"{parameter}": ').tolist()[0]
+            encoded_arg_name += self.encode(f"    {parameter} = ").tolist()[0]
             while True:
-                print("========== \n Request:\n", self.decode(encoded_function + encode_request + encoded_arg_name + res_token))
+                # print("========== \n Request:\n", self.decode(
+                #     encoded_fn_info + encode_request +
+                #     encoded_arg_name + res_token))
                 lst_proba = self.get_logits_from_input_ids(
-                    encoded_function + encode_request + encoded_arg_name + res_token)
+                    encoded_fn_info + encode_request +
+                    encoded_arg_name + res_token)
                 ids = int(np.argmax(lst_proba))
-                print("res:\n", self.decode(ids))
+                # print("res:\n", self.decode(ids))
                 ids_decodes = self.decode(ids)
-                if "}" in ids_decodes:
-                    if ids_decodes[0] != "}":
-                        res_token += self.encode(ids_decodes[0]).tolist()[0]
-                    break
-                elif "," in ids_decodes:
-                    if ids_decodes[0] != ",":
-                        res_token += self.encode(ids_decodes[0]).tolist()[0]
+                if "\n" in ids_decodes:
+                    if ids_decodes[0] != "\n":
+                        to_add = ""
+                        for car in ids_decodes:
+                            if car == '\n':
+                                break
+                            to_add += car
+                        res_token += self.encode(to_add).tolist()[0]
                     break
                 res_token.append(ids)
             if parameter != parameters_lst[-1]:
-                encoded_arg_name += res_token + self.encode(", ").tolist()[0]
-            else:
-                encoded_arg_name += res_token + self.encode("}").tolist()[0]
+                encoded_arg_name += res_token + self.encode("\n").tolist()[0]
             return_dict[parameter] = self.decode(res_token)
+        for key, val in return_dict.items():
+            val = val.strip()
+            try:
+                val = int(val)
+            except Exception:
+                if ("\"" in val[0] or '\'' in val[0]) and (
+                   "\"" in val[-1] or '\'' in val[-1]):
+                    val = val[1:-1]
+            return_dict[key] = val
         return return_dict
 
 
@@ -116,17 +137,14 @@ for prompt_data in prompt_dict:
     name = llm.find_function_name(request=prompt_data["prompt"])
     param = llm.find_parameter(prompt_data["prompt"], name)
     print(param)
-    arg_param = {}
     result.append({
         "prompt": prompt_data["prompt"],
         "name": name,
         "parameters": param
     })
-    print(result[-1])
 
+print(result)
 
-
-
-output_file = "data/output/function_calling_results_test_2.json"
+output_file = "data/output/function_calling_results.json"
 with open(output_file, "w") as f:
     json.dump(result, f, indent=4)
