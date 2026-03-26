@@ -125,11 +125,32 @@ class Small_LLM_Model:
         )
         return tokenizer_path
 
-    def forward_with_cache(self, input_ids, past_key_values=None):
-        with torch.no_grad():
+    def init_generation(self, input_ids: list[int]):
+        input_tensor = torch.tensor([input_ids], device=self._device, dtype=torch.long)
+
+        with torch.inference_mode():
             outputs = self._model(
-                input_ids=input_ids,
+                input_ids=input_tensor,
+                use_cache=True
+            )
+
+        logits = outputs.logits[:, -1, :]
+        next_token = int(torch.argmax(logits, dim=-1).item())
+
+        return next_token, outputs.past_key_values
+
+
+    def next_token_with_cache(self, token_id: int, past_key_values):
+        input_tensor = torch.tensor([[token_id]], device=self._device, dtype=torch.long)
+
+        with torch.inference_mode():
+            outputs = self._model(
+                input_ids=input_tensor,
                 past_key_values=past_key_values,
                 use_cache=True
             )
-        return outputs.logits, outputs.past_key_values
+
+        logits = outputs.logits[:, -1, :]
+        next_token = int(torch.argmax(logits, dim=-1).item())
+
+        return next_token, outputs.past_key_values

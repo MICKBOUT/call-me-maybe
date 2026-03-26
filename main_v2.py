@@ -2,7 +2,6 @@ import json
 from typing import Optional, Any
 import numpy
 
-import torch
 from llm_sdk.llm_sdk import Small_LLM_Model
 
 
@@ -70,36 +69,24 @@ class custom_llm(Small_LLM_Model):
                 "<think>\n\n</think>\n"
             )
 
-        input_ids = self.encode(formated_prompte)
+        input_ids = self.encode_lst(formated_prompte)
 
-        # FIRST PASS (full prompt)
-        logits, past = self.forward_with_cache(input_ids)
+        # INIT (full prompt once)
+        next_token, past = self.init_generation(input_ids)
 
-        generated = []
         answer = ""
-
-        # get first token
-        next_token = torch.argmax(logits[:, -1, :], dim=-1)
 
         for i in range(max_new_tokens):
 
-            token_id = next_token.item()
-
-            if token_id == self.end_token_id:
+            if next_token == self.end_token_id:
                 break
 
-            generated.append(token_id)
-
-            decoded = self.decode([token_id])
+            decoded = self.decode([next_token])
             print(decoded, end="", flush=True)
             answer += decoded
 
-            # ONLY pass last token now
-            next_input = next_token.unsqueeze(0)
-
-            logits, past = self.forward_with_cache(next_input, past)
-
-            next_token = torch.argmax(logits[:, -1, :], dim=-1)
+            # NEXT TOKEN (fast path)
+            next_token, past = self.next_token_with_cache(next_token, past)
 
         print(f"\n{i}/{max_new_tokens} tokens used")
         return answer
