@@ -3,7 +3,7 @@ VENV        = .venv
 VENV_BIN    = $(VENV)/bin
 V_PYTHON    = $(VENV_BIN)/python
 
-MAIN        = main.py
+MAIN        = main_v2.py
 STAMP       = $(VENV)/.install.stamp
 VENV_STAMP  = $(VENV)/.venv.stamp
 
@@ -37,7 +37,6 @@ install: $(STAMP)
 run: $(STAMP)
 	$(V_PYTHON) $(MAIN)
 
-
 profiler: $(STAMP)
 	-@$(V_PYTHON) -m cProfile -o profile.stats $(MAIN) config.txt "profiler"
 	snakeviz profile.stats
@@ -47,7 +46,7 @@ clean:
 	@rm -rf $(VENV) dist $(OUTPUT_FILE)
 	@find . -type d -name "__pycache__" -exec rm -rf {} +
 	@find . -type d -name ".mypy_cache" -exec rm -rf {} +
-	@rm -rf .pytest_cache output_maze.txt
+	@rm -rf .pytest_cache
 	@rm -rf assets/rescaled
 	@echo "Clean complete"
 

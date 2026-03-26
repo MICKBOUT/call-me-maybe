@@ -1,46 +1,56 @@
 import json
 import numpy as np
 
+from typing import Optional
+
 from llm_sdk.llm_sdk import Small_LLM_Model
-# from tree_visualizer import build_rich_tree_fn
+from tree_visualizer import build_rich_tree_fn
 
 
 class custom_llm(Small_LLM_Model):
-    def __init__(self,
-                 function_path: str = "data/input/functions_definition.json"):
-        super().__init__()
+    def __init__(
+        self,
+        function_path: Optional[str] = "data/input/functions_definition.json",
+        model_name: Optional[str] = None
+      ):
+        super().__init__(model_name) if model_name else super().__init__()
+        self.tokenize_back_n = self.encode_to_list("\n")
+
         # loading json
         with open(function_path, 'r') as f:
-            self.fn_lst = json.load(f)
+            fn_lst_dict = json.load(f)
 
+        # dict w/ key: value (name: json_data)
         self.dict_function = {}
-        for d in self.fn_lst:
+        for d in fn_lst_dict:
             self.dict_function[d["name"]] = d
-        # build_rich_tree_fn(self.dict_function)
 
         self.fn_dict = {}
-        for fn in self.fn_lst:
-            tokens = self.encode(fn["name"]).tolist()[0]
+        for function in fn_lst_dict:
+            fn_tokenized = self.encode_to_list(function["name"])
             leaf = self.fn_dict
-            for token in tokens:
+            for token in fn_tokenized:
                 if token not in leaf:
                     leaf[token] = {}
                 leaf = leaf[token]
             leaf[1] = None  # set an end to the tree (avoid infinit loop)
+        build_rich_tree_fn(self.fn_dict)
 
         # json to str
-        self.function_str = str(self.fn_lst) + '\n'
+        function_str = str(fn_lst_dict) + '\n'
 
         # function encoded to ids
-        encoded_Tensor = self.encode(self.function_str)
-        self.function_encoded = encoded_Tensor.tolist()[0]
+        self.function_encoded = self.encode_to_list(function_str)
+
+    def encode_to_list(self, text: str) -> list[int]:
+        return self.encode(text).tolist()[0]
 
     def find_next_ell(self, tree_posibility: dict, request: str) -> str:
         res_token = []
         leaf = tree_posibility
         proba, ids = float("-inf"), -1
 
-        encode_request = self.encode(request).tolist()[0]
+        encode_request = self.encode_to_list(request)
         while leaf:
             proba, ids = float("-inf"), -1
             lst_proba = self.get_logits_from_input_ids(
@@ -55,11 +65,8 @@ class custom_llm(Small_LLM_Model):
         return self.decode(res_token)
 
     def find_function_name(self, request: str):
-        request_str = '{"prompt": "' + \
-            request + \
-            '", "name": "'
-        encoded_Tensor = self.encode(request_str)
-        self.encoded_json = encoded_Tensor.tolist()[0]
+        request_str = f"Prompt = {request}\n  fn_used ="
+        self.encoded_json = self.encode_to_list(request_str)
 
         return self.find_next_ell(self.fn_dict, request_str)
 
@@ -75,30 +82,25 @@ class custom_llm(Small_LLM_Model):
         return res
 
     def find_parameter(self, request: str, function_name: str):
-        parameters_lst = [
-            list(ell["parameters"].keys()) for ell in self.fn_lst
-            if ell["name"] == function_name][0]
+        parameters_lst = list(self.dict_function[function_name]["parameters"].keys())
 
-        encoded_fn_info = self.encode(
-            self.readable_function(function_name)).tolist()[0]
+        encoded_fn_info = self.encode_to_list(
+            self.readable_function(function_name))
         request_str = f"Prompt = {request}\n" +\
             "  Parameters:\n"
-        encode_request = self.encode(request_str).tolist()[0]
+        encode_request = self.encode_to_list(request_str)
 
         return_dict = {}
         encoded_arg_name = []
+
+        static_prefix = encoded_fn_info + encode_request
         for parameter in parameters_lst:
             res_token = []
-            encoded_arg_name += self.encode(f"    {parameter} = ").tolist()[0]
+            encoded_arg_name += self.encode_to_list(f"    {parameter} = ")
             while True:
-                # print("========== \n Request:\n", self.decode(
-                #     encoded_fn_info + encode_request +
-                #     encoded_arg_name + res_token))
-                lst_proba = self.get_logits_from_input_ids(
-                    encoded_fn_info + encode_request +
-                    encoded_arg_name + res_token)
+                lst_proba = np.array(self.get_logits_from_input_ids(
+                    static_prefix + encoded_arg_name + res_token))
                 ids = int(np.argmax(lst_proba))
-                # print("res:\n", self.decode(ids))
                 ids_decodes = self.decode(ids)
                 if "\n" in ids_decodes:
                     if ids_decodes[0] != "\n":
@@ -107,11 +109,11 @@ class custom_llm(Small_LLM_Model):
                             if car == '\n':
                                 break
                             to_add += car
-                        res_token += self.encode(to_add).tolist()[0]
+                        res_token += self.encode_to_list(to_add)
                     break
                 res_token.append(ids)
             if parameter != parameters_lst[-1]:
-                encoded_arg_name += res_token + tokenize_back_n
+                encoded_arg_name += res_token + self.tokenize_back_n
             return_dict[parameter] = self.decode(res_token)
         for key, val in return_dict.items():
             val = val.strip()
@@ -125,27 +127,29 @@ class custom_llm(Small_LLM_Model):
         return return_dict
 
 
-llm = custom_llm()
-tokenize_back_n = llm.encode("\n").tolist()[0]
+def main() -> None:
+    llm = custom_llm("data/input/functions_definition.json")
 
-path_prompt = "data/input/function_calling_tests.json"
-with open(path_prompt, 'r') as f:
-    prompt_dict = json.load(f)
+    path_prompt = "data/input/function_calling_tests.json"
+    with open(path_prompt, 'r') as f:
+        prompt_dict = json.load(f)
+
+    result = []
+    for prompt_data in prompt_dict:
+        fn_name = llm.find_function_name(request=prompt_data["prompt"])
+        param = llm.find_parameter(prompt_data["prompt"], fn_name)
+        print(param)
+        result.append({
+            "prompt": prompt_data["prompt"],
+            "name": fn_name,
+            "parameters": param
+        })
+
+    output_file = "data/output/function_calling_results.json"
+    with open(output_file, "w") as f:
+        json.dump(result, f, indent=4)
 
 
-result = []
-for prompt_data in prompt_dict:
-    name = llm.find_function_name(request=prompt_data["prompt"])
-    param = llm.find_parameter(prompt_data["prompt"], name)
-    print(param)
-    result.append({
-        "prompt": prompt_data["prompt"],
-        "name": name,
-        "parameters": param
-    })
 
-print(result)
-
-output_file = "data/output/function_calling_results.json"
-with open(output_file, "w") as f:
-    json.dump(result, f, indent=4)
+if __name__ == "__main__":
+    main()

@@ -1,8 +1,8 @@
+use pydantic to verifie that the json is corecte
+
 for function name:
+use normal english for the function name (insted of json)
 
-model: lst of function lst + description
-[name = fn_add_number, description = add two number], [name = get_sqrt_root, description = get the sqrt root of a number]
+convert to an int a unmber only if the function name takes an int as paramater
 
-for arguments:
-model: function_name + description + arg 1: int = 
-[name = "fn_add_number", "description" = "add two number", parameter = [int a = "..., int b "]
+use other function that encode and decode in the scripte
