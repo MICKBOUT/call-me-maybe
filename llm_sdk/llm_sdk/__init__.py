@@ -124,3 +124,12 @@ class Small_LLM_Model:
             filename=tokenizer_file_name
         )
         return tokenizer_path
+
+    def forward_with_cache(self, input_ids, past_key_values=None):
+        with torch.no_grad():
+            outputs = self._model(
+                input_ids=input_ids,
+                past_key_values=past_key_values,
+                use_cache=True
+            )
+        return outputs.logits, outputs.past_key_values

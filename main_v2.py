@@ -2,6 +2,7 @@ import json
 from typing import Optional, Any
 import numpy
 
+import torch
 from llm_sdk.llm_sdk import Small_LLM_Model
 
 
@@ -44,11 +45,12 @@ class custom_llm(Small_LLM_Model):
         return self.encode(text).tolist()[0]
 
     def generate(
-            self,
-            prompt: str,
-            thinking: bool = True,
-            max_new_tokens: int = 512
-      ) -> str:
+        self,
+        prompt: str,
+        thinking: bool = True,
+        max_new_tokens: int = 512
+    ) -> str:
+
         if thinking:
             formated_prompte = (
                 "<|im_start|>system\n"
@@ -65,29 +67,41 @@ class custom_llm(Small_LLM_Model):
                 "<|im_start|>user\n"
                 f"{prompt}<|im_end|>\n"
                 "<|im_start|>assistant\n"
-                "<think>\n\n"
-                "</think>\n"
+                "<think>\n\n</think>\n"
             )
 
-        # encode the formated_prompte
-        input_ids = self.encode_lst(formated_prompte)
+        input_ids = self.encode(formated_prompte)
+
+        # FIRST PASS (full prompt)
+        logits, past = self.forward_with_cache(input_ids)
+
         generated = []
         answer = ""
+
+        # get first token
+        next_token = torch.argmax(logits[:, -1, :], dim=-1)
+
         for i in range(max_new_tokens):
-            logits = self.get_logits_from_input_ids(input_ids + generated)
 
-            # greedy: pick highest logit
-            next_token = int(numpy.argmax(logits))
+            token_id = next_token.item()
 
-            # stop if end token
-            if next_token == self.end_token_id:
+            if token_id == self.end_token_id:
                 break
 
-            generated.append(next_token)
-            decoded_token = self.decode(next_token)
-            print(self.decode(next_token), end="", flush=True)
-            answer += decoded_token
-        print(f"{i}/{max_new_tokens} token used")
+            generated.append(token_id)
+
+            decoded = self.decode([token_id])
+            print(decoded, end="", flush=True)
+            answer += decoded
+
+            # ONLY pass last token now
+            next_input = next_token.unsqueeze(0)
+
+            logits, past = self.forward_with_cache(next_input, past)
+
+            next_token = torch.argmax(logits[:, -1, :], dim=-1)
+
+        print(f"\n{i}/{max_new_tokens} tokens used")
         return answer
 
 
