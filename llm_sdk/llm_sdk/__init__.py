@@ -134,10 +134,10 @@ class Small_LLM_Model:
                 use_cache=True
             )
 
-        logits = outputs.logits[:, -1, :]
-        next_token = int(torch.argmax(logits, dim=-1).item())
+        logits = outputs.logits[0, -1].tolist()
+        # next_token = int(torch.argmax(logits, dim=-1).item())
 
-        return next_token, outputs.past_key_values
+        return logits, outputs.past_key_values
 
 
     def next_token_with_cache(self, token_id: int, past_key_values):
@@ -150,7 +150,7 @@ class Small_LLM_Model:
                 use_cache=True
             )
 
-        logits = outputs.logits[:, -1, :]
-        next_token = int(torch.argmax(logits, dim=-1).item())
+        # next_token = int(torch.argmax(logits, dim=-1).item())
+        logits = outputs.logits[0, -1].tolist()
 
-        return next_token, outputs.past_key_values
+        return logits, outputs.past_key_values

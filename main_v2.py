@@ -1,6 +1,6 @@
 import json
-from typing import Optional, Any
-import numpy
+from typing import Optional
+import numpy as np
 
 from llm_sdk.llm_sdk import Small_LLM_Model
 
@@ -15,8 +15,8 @@ class custom_llm(Small_LLM_Model):
         super().__init__(
             model_name,
         )
-
-        self.end_token_id = self.encode_lst("<|im_end|>")[0]
+        end_token = "<|im_end|>"
+        self.end_token_id = self.encode_lst(end_token)[0]
 
         with open(function_file, 'r') as f:
             function_json = json.load(f)
@@ -30,6 +30,7 @@ class custom_llm(Small_LLM_Model):
                 if token not in leaf:
                     leaf[token] = {"name": self.decode(token)} if display_tree else {}
                 leaf = leaf[token]
+            leaf[self.end_token_id] = {"name": end_token} if display_tree else {}
         # code to visulise the tree
         if display_tree:
             from tree_visualizer import build_rich_tree
@@ -43,6 +44,40 @@ class custom_llm(Small_LLM_Model):
     def encode_lst(self, text: str) -> list[int]:
         return self.encode(text).tolist()[0]
 
+    def find_fn(self, prompt):
+        formated_prompt = (
+           "<|im_start|>system\n"
+           "You are a function selector. Given a user request, respond with ONLY the name of the most appropriate function to call. No explanation, no arguments, just the function name.<|im_end|>\n"
+           "<|im_start|>user\n"
+           f"{prompt}<|im_end|>\n"
+           "<|im_start|>assistant\n"
+           "<think>\n\n</think>\n"
+        )
+
+        answer = ""
+        tree_function = self.tree_function
+        input_ids = self.encode_lst(formated_prompt)
+        logits, past = self.init_generation(input_ids)
+
+        while True:
+            next_token = max(
+                (k for k in tree_function if isinstance(k, int)),  # skip str
+                key=lambda t: logits[t],
+                default=self.end_token_id
+            )
+
+            if next_token == self.end_token_id:
+                break
+
+            tree_function = tree_function[next_token]
+
+            decoded = self.decode([next_token])
+            answer += decoded
+
+            logits, past = self.next_token_with_cache(next_token, past)
+
+        return answer
+
     def generate(
         self,
         prompt: str,
@@ -51,7 +86,7 @@ class custom_llm(Small_LLM_Model):
     ) -> str:
 
         if thinking:
-            formated_prompte = (
+            formated_prompt = (
                 "<|im_start|>system\n"
                 "You are a assistant.<|im_end|>\n"
                 "<|im_start|>user\n"
@@ -60,7 +95,7 @@ class custom_llm(Small_LLM_Model):
                 "<think>\n"
             )
         else:
-            formated_prompte = (
+            formated_prompt = (
                 "<|im_start|>system\n"
                 "You are a helpful assistant. /no_think<|im_end|>\n"
                 "<|im_start|>user\n"
@@ -69,11 +104,10 @@ class custom_llm(Small_LLM_Model):
                 "<think>\n\n</think>\n"
             )
 
-        input_ids = self.encode_lst(formated_prompte)
+        input_ids = self.encode_lst(formated_prompt)
 
-        # INIT (full prompt once)
-        next_token, past = self.init_generation(input_ids)
-
+        logits, past = self.init_generation(input_ids)
+        next_token = int(np.argmax(logits))
         answer = ""
 
         for i in range(max_new_tokens):
@@ -86,16 +120,27 @@ class custom_llm(Small_LLM_Model):
             answer += decoded
 
             # NEXT TOKEN (fast path)
-            next_token, past = self.next_token_with_cache(next_token, past)
+            logits, past = self.next_token_with_cache(next_token, past)
+            next_token = int(np.argmax(logits))
 
         print(f"\n{i}/{max_new_tokens} tokens used")
         return answer
 
 
 if __name__ == "__main__":
+
     llm = custom_llm(display_tree=False)
-
     # Qwen3 chat template format — hardcoded as a plain string
-    user_message = "what is the height of an average beluga in cm ?"
+    # user_message = "Yes or No, am i good looking ?"
+    # llm.generate(user_message, thinking=True)
 
-    llm.generate(user_message, thinking=True)
+    # test fn name
+    path_prompt = "data/input/function_calling_tests.json"
+    with open(path_prompt, 'r') as f:
+        prompt_dict = json.load(f)
+
+    result = []
+    for prompt_data in prompt_dict:
+        result.append(llm.find_fn(prompt_data))
+
+    print(result)
