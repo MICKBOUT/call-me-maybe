@@ -15,6 +15,9 @@ class custom_llm(Small_LLM_Model):
         super().__init__(
             model_name,
         )
+
+        back_n = "\n"
+        self.back_n_id = self.encode_lst(back_n)[0]
         end_token = "<|im_end|>"
         self.end_token_id = self.encode_lst(end_token)[0]
 
@@ -36,6 +39,17 @@ class custom_llm(Small_LLM_Model):
             from tree_visualizer import build_rich_tree
             build_rich_tree(self.tree_function)
 
+        # CONSTRAINED_SET
+        self.integer_constrained = {
+            self.encode_lst(ell)[0] for ell in
+            {"0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "\n"}}
+
+        self.number_constrained = self.integer_constrained | {self.encode_lst(".")[0]}
+
+        self.boolean_constrained = {
+            self.encode_lst(ell)[0] for ell in
+            {"True", "False", "\n"}}
+
         # create a dict w/ key: value (fn_name: fn_data)
         self.function_dict = {
             function["name"]: function
@@ -45,6 +59,10 @@ class custom_llm(Small_LLM_Model):
         return self.encode(text).tolist()[0]
 
     def find_fn(self, prompt):
+        # currently, the description of the fn is not passed in parameter
+        # and i got 100% accuracy,
+        # but if the qualtiy start to drop i will add it
+
         formated_prompt = (
            "<|im_start|>system\n"
            "You are a function selector. Given a user request, respond with ONLY the name of the most appropriate function to call. No explanation, no arguments, just the function name.<|im_end|>\n"
@@ -54,11 +72,10 @@ class custom_llm(Small_LLM_Model):
            "<think>\n\n</think>\n"
         )
 
-        answer = ""
+        answer = []
         tree_function = self.tree_function
         input_ids = self.encode_lst(formated_prompt)
         logits, past = self.init_generation(input_ids)
-
         while True:
             next_token = max(
                 (k for k in tree_function if isinstance(k, int)),  # skip str
@@ -70,13 +87,71 @@ class custom_llm(Small_LLM_Model):
                 break
 
             tree_function = tree_function[next_token]
-
-            decoded = self.decode([next_token])
-            answer += decoded
+            answer.append(next_token)
 
             logits, past = self.next_token_with_cache(next_token, past)
 
-        return answer
+        return self.decode(answer)
+
+    def find_args(self, prompt: str, fn_name: str) -> dict:
+        def constrian_type(prompte, constrained_set, type: callable) -> str:
+            print("constraine type used")
+            arg = []
+            input_ids = self.encode_lst(prompte)
+            logits, past = self.init_generation(input_ids)
+            while True:
+                next_token = max(
+                    (k for k in constrained_set),
+                    key=lambda t: logits[t],
+                    default=self.end_token_id
+                )
+
+                if next_token == self.back_n_id:
+                    break
+                arg.append(next_token)
+
+                logits, past = self.next_token_with_cache(next_token, past)
+            value = type(self.decode(arg))
+            return value
+
+        fn_data = self.function_dict[fn_name]
+        args = {}
+
+        already_extracted = ""
+        for arg_name, arg_data in fn_data["parameters"].items():
+            formated_prompt = (
+                f"promp = {prompt}\n"
+                f"function:\n"
+                f"  fn_name = {fn_name}\n"
+                f"  Description: {fn_data["description"]}\n"
+                "args:\n"
+                f"{already_extracted}"
+                f"{arg_name}: {arg_data['type']} ="
+            )
+
+            if arg_data['type'] == "number":
+                value = constrian_type(formated_prompt, self.number_constrained, float)
+            elif arg_data['type'] == "integer":
+                value = constrian_type(formated_prompt, self.integer_constrained, int)
+            elif arg_data['type'] == "boolean":
+                value = constrian_type(formated_prompt, self.boolean_constrained, bool)
+            else:
+                arg = []
+                input_ids = self.encode_lst(formated_prompt)
+                logits, past = self.init_generation(input_ids)
+                next_token = int(np.argmax(logits))
+                while next_token != self.end_token_id and "\n" not in self.decode(next_token):
+                    arg.append(next_token)
+
+                    logits, past = self.next_token_with_cache(next_token, past)
+                    next_token = int(np.argmax(logits))
+
+                value = self.decode(arg)
+
+            already_extracted += f"{arg_name}: {arg_data['type']} = {value}\n"
+            args[arg_name] = value
+
+        return args
 
     def generate(
         self,
@@ -130,27 +205,26 @@ class custom_llm(Small_LLM_Model):
 if __name__ == "__main__":
 
     llm = custom_llm(display_tree=False)
-    # Qwen3 chat template format — hardcoded as a plain string
-    # user_message = "Yes or No, am i good looking ?"
-    # llm.generate(user_message, thinking=True)
 
     # test fn name
     path_prompt = "data/input/function_calling_tests.json"
     with open(path_prompt, 'r') as f:
         prompt_dict = json.load(f)
 
-    import time
-    t = time.time()
     result = []
     for prompt_data in prompt_dict:
         fn_name = llm.find_fn(prompt_data["prompt"])
-        # param = llm.find_parameter(prompt_data["prompt"], fn_name)
+        param = llm.find_args(prompt_data["prompt"], fn_name)
         print(fn_name)
+        print(param)
         result.append({
             "prompt": prompt_data["prompt"],
             "name": fn_name,
-            # "parameters": param
+            "parameters": param
         })
-    print(f"{time.time() - t}s")
 
-    # print(result)
+    output_file = "data/output/function_calling_results.json"
+    with open(output_file, "w") as f:
+        json.dump(result, f, indent=4)
+    print("\n\n")
+    print(result)
