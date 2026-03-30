@@ -139,8 +139,18 @@ if __name__ == "__main__":
     with open(path_prompt, 'r') as f:
         prompt_dict = json.load(f)
 
+    import time
+    t = time.time()
     result = []
     for prompt_data in prompt_dict:
-        result.append(llm.find_fn(prompt_data))
+        fn_name = llm.find_fn(prompt_data["prompt"])
+        # param = llm.find_parameter(prompt_data["prompt"], fn_name)
+        print(fn_name)
+        result.append({
+            "prompt": prompt_data["prompt"],
+            "name": fn_name,
+            # "parameters": param
+        })
+    print(f"{time.time() - t}s")
 
-    print(result)
+    # print(result)
