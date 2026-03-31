@@ -95,7 +95,6 @@ class custom_llm(Small_LLM_Model):
 
     def find_args(self, prompt: str, fn_name: str) -> dict:
         def constrian_type(prompte, constrained_set, type: callable) -> str:
-            print("constraine type used")
             arg = []
             input_ids = self.encode_lst(prompte)
             logits, past = self.init_generation(input_ids)
@@ -120,13 +119,16 @@ class custom_llm(Small_LLM_Model):
         already_extracted = ""
         for arg_name, arg_data in fn_data["parameters"].items():
             formated_prompt = (
-                f"promp = {prompt}\n"
+                "<|im_start|>system\n"
+                "Your task is to use the function call to archived the task ask in the following prompt. (raw data)<|im_end|>\n"
+                "<|im_start|>assistant\n"
+                f"prompt = {prompt}\n"
                 f"function:\n"
                 f"  fn_name = {fn_name}\n"
-                f"  Description: {fn_data["description"]}\n"
+                # f"  Description = {fn_data["description"]}\n"
                 "args:\n"
-                f"{already_extracted}"
-                f"{arg_name}: {arg_data['type']} ="
+                f"  {already_extracted}"
+                f"  {arg_name}: {arg_data['type']} ="
             )
 
             if arg_data['type'] == "number":
@@ -136,19 +138,34 @@ class custom_llm(Small_LLM_Model):
             elif arg_data['type'] == "boolean":
                 value = constrian_type(formated_prompt, self.boolean_constrained, bool)
             else:
-                arg = []
                 input_ids = self.encode_lst(formated_prompt)
                 logits, past = self.init_generation(input_ids)
                 next_token = int(np.argmax(logits))
-                while next_token != self.end_token_id and "\n" not in self.decode(next_token):
-                    arg.append(next_token)
+                value = ""
+
+                next_token_value = self.decode(next_token)
+                while "\n" not in next_token_value:
+                    value += next_token_value
 
                     logits, past = self.next_token_with_cache(next_token, past)
                     next_token = int(np.argmax(logits))
+                    next_token_value = self.decode(next_token)
 
-                value = self.decode(arg)
+                for c in next_token_value:
+                    if c == "\n":
+                        break
+                    value += c
+                try:
+                    while value[0] == " ":
+                        value = value[1:]
+                    if value[0] == "'" and value[-1] == "'":
+                        value = value[1:-1]
+                    elif value[0] == '"' and value[-1] == '"':
+                        value = value[1:-1]
+                except Exception:
+                    pass
 
-            already_extracted += f"{arg_name}: {arg_data['type']} = {value}\n"
+            already_extracted += f"  {arg_name}: {arg_data['type']} = {value}\n"
             args[arg_name] = value
 
         return args
