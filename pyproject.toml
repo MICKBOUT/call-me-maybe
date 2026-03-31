@@ -16,7 +16,8 @@ classifiers = [
 dependencies = [
     "torch==2.6.0+cpu",
     "numpy",
-    "transformers",
+    "transformers>=4.40.0",
+    "huggingface-hub>=0.20.0",
 ]
 
 [[tool.uv.index]]

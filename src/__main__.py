@@ -1,8 +1,9 @@
 import json
 from typing import Optional
 import numpy as np
+import argparse
 
-from llm_sdk.llm_sdk import Small_LLM_Model
+from llm_sdk import Small_LLM_Model
 
 
 class custom_llm(Small_LLM_Model):
@@ -15,7 +16,6 @@ class custom_llm(Small_LLM_Model):
         super().__init__(
             model_name,
         )
-
         back_n = "\n"
         self.back_n_id = self.encode_lst(back_n)[0]
         end_token = "<|im_end|>"
@@ -58,7 +58,7 @@ class custom_llm(Small_LLM_Model):
     def encode_lst(self, text: str) -> list[int]:
         return self.encode(text).tolist()[0]
 
-    def find_fn(self, prompt):
+    def find_fn(self, prompt: str) -> str:
         # currently, the description of the fn is not passed in parameter
         # and i got 100% accuracy,
         # but if the qualtiy start to drop i will add it
@@ -211,7 +211,6 @@ class custom_llm(Small_LLM_Model):
             print(decoded, end="", flush=True)
             answer += decoded
 
-            # NEXT TOKEN (fast path)
             logits, past = self.next_token_with_cache(next_token, past)
             next_token = int(np.argmax(logits))
 
@@ -219,20 +218,41 @@ class custom_llm(Small_LLM_Model):
         return answer
 
 
-if __name__ == "__main__":
+def main() -> None:
+    parser = argparse.ArgumentParser(description="call_me_maybe")
 
-    llm = custom_llm(display_tree=False)
+    parser.add_argument(
+        "--functions_definition",
+        type=str,
+        default="data/input/functions_definition.json",
+        help="Path or content of the functions definition"
+    )
+    parser.add_argument(
+        "--input",
+        type=str,
+        default="data/input/function_calling_tests.json",
+        help="Input data"
+    )
+    parser.add_argument(
+        "--output",
+        type=str,
+        default="data/output/function_calling_results.json",
+        help="Output path or format"
+    )
+    args = parser.parse_args()
 
-    # test fn name
-    path_prompt = "data/input/function_calling_tests.json"
-    with open(path_prompt, 'r') as f:
+    llm = custom_llm(
+        function_file=args.functions_definition,
+        display_tree=False
+    )
+
+    with open(args.input, 'r') as f:
         prompt_dict = json.load(f)
 
     result = []
     for prompt_data in prompt_dict:
         fn_name = llm.find_fn(prompt_data["prompt"])
         param = llm.find_args(prompt_data["prompt"], fn_name)
-        print(fn_name)
         print(param)
         result.append({
             "prompt": prompt_data["prompt"],
@@ -240,8 +260,10 @@ if __name__ == "__main__":
             "parameters": param
         })
 
-    output_file = "data/output/function_calling_results.json"
-    with open(output_file, "w") as f:
+    with open(args.output, "w") as f:
         json.dump(result, f, indent=4)
-    print("\n\n")
-    print(result)
+
+    print("\n\n", result)
+
+if __name__ == "__main__":
+    main()

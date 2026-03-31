@@ -3,9 +3,9 @@ VENV        = .venv
 VENV_BIN    = $(VENV)/bin
 V_PYTHON    = $(VENV_BIN)/python
 
-MAIN        = main_v2.py
+MAIN        = src/__main__.py
 STAMP       = $(VENV)/.install.stamp
-VENV_STAMP  = $(VENV)/.venv.stamp
+VENV_STAMP  = $(VENV)/.ve.stamp
 
 build: $(OUTPUT_FILE)
 
@@ -35,7 +35,8 @@ $(STAMP): $(VENV_STAMP)
 install: $(STAMP)
 
 run: $(STAMP)
-	$(V_PYTHON) $(MAIN)
+	@echo "Running LLM..."
+	$(V_PYTHON) -m src
 
 profiler: $(STAMP)
 	-@$(V_PYTHON) -m cProfile -o profile.stats $(MAIN) config.txt "profiler"
