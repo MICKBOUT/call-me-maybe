@@ -1,4 +1,3 @@
-# src/type_aliases.py
 from typing import TypeAlias
 
 # Recursive tree node for function trie

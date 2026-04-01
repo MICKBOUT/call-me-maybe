@@ -1,8 +1,0 @@
-use pydantic to verifie that the json is corecte
-
-for function name:
-use normal english for the function name (insted of json)
-
-convert to an int a unmber only if the function name takes an int as paramater
-
-use other function that encode and decode in the scripte

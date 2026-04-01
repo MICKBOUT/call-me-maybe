@@ -23,9 +23,6 @@ class custom_llm(Small_LLM_Model):
         end_token = "<|im_end|>"
         self.end_token_id = self.encode_lst(end_token)[0]
 
-        with open(function_file, 'r') as f:
-            function_json = json.load(f)
-
         # Tree to choose the right function
         self.tree_function: TreeNode = {
             self.end_token_id:
@@ -103,7 +100,7 @@ class custom_llm(Small_LLM_Model):
         def constrian_type(
           prompte: str,
           constrained_set: ConstrainedSet,
-          arg_type: Callable
+          arg_type: Callable[[str], Any]
         ) -> Any:
             arg = []
             input_ids = self.encode_lst(prompte)
@@ -260,8 +257,11 @@ def main() -> None:
         function_file=args.functions_definition,
         display_tree=False
     )
-    with open(args.input, 'r') as f:
-        prompt_dict = json.load(f)
+    try:
+        with open(args.input, 'r') as f:
+            prompt_dict = json.load(f)
+    except Exception:
+        print("Error will loading the prompte")
 
     result = []
     print()
@@ -278,10 +278,11 @@ def main() -> None:
             "parameters": param
         })
 
-    with open(args.output, "w") as f:
-        json.dump(result, f, indent=4)
-
-    print("\n\n", result)
+    try:
+        with open(args.output, "w") as f:
+            json.dump(result, f, indent=4)
+    except Exception:
+        print("Error will writing the output")
 
 
 if __name__ == "__main__":

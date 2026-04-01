@@ -28,11 +28,11 @@ explicit = true
 [tool.uv.sources]
 torch = { index = "pytorch-cpu" }
 
-
-
 [project.optional-dependencies]
 dev = [
-    "snakeviz"
+    "snakeviz",
+    "flake8",
+    "mypy",
 ]
 
 [project.urls]
@@ -48,6 +48,15 @@ pythonpath = ["src"]
 mypy_path = "src"
 files = ["src"]
 [[tool.mypy.overrides]]
-module = "llm_sdk.*"
+module = [
+    "rich.*",
+    "llm_sdk.*",
+    "type_aliases"
+]
 ignore_errors = true
 ignore_missing_imports = true
+
+[dependency-groups]
+dev = [
+    "snakeviz>=2.2.2",
+]
