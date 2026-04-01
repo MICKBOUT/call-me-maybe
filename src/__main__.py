@@ -42,7 +42,7 @@ class custom_llm(Small_LLM_Model):
         # CONSTRAINED_SET
         self.integer_constrained = {
             self.encode_lst(ell)[0] for ell in
-            {"0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "\n"}}
+            {"0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "-", "\n"}}
 
         self.number_constrained = self.integer_constrained | {self.encode_lst(".")[0]}
 
@@ -120,14 +120,14 @@ class custom_llm(Small_LLM_Model):
         for arg_name, arg_data in fn_data["parameters"].items():
             formated_prompt = (
                 "<|im_start|>system\n"
-                "Your task is to use the function call to archived the task ask in the following prompt. (raw data)<|im_end|>\n"
+                "Your task is to use the function call to archived the task ask in the following prompt. (raw data)\n"
+                f"prompte = {prompt}\n"
                 "<|im_start|>assistant\n"
-                f"prompt = {prompt}\n"
                 f"function:\n"
                 f"  fn_name = {fn_name}\n"
                 # f"  Description = {fn_data["description"]}\n"
                 "args:\n"
-                f"  {already_extracted}"
+                f"{already_extracted}"
                 f"  {arg_name}: {arg_data['type']} ="
             )
 
@@ -245,6 +245,7 @@ def main() -> None:
         function_file=args.functions_definition,
         display_tree=False
     )
+    print(llm.get_path_to_tokenizer_file())
 
     with open(args.input, 'r') as f:
         prompt_dict = json.load(f)
@@ -264,6 +265,7 @@ def main() -> None:
         json.dump(result, f, indent=4)
 
     print("\n\n", result)
+
 
 if __name__ == "__main__":
     main()
