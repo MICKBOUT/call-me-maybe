@@ -2,7 +2,7 @@
 # ABOUTME: Provides Small_LLM_Model class for loading and running causal language models.
 
 import time
-from typing import Tuple
+from typing import Any
 
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer, PreTrainedTokenizer, PreTrainedModel, logging
@@ -73,7 +73,6 @@ class Small_LLM_Model:
         for p in self._model.parameters():
             p.requires_grad = False
 
-
     def encode(self, text: str) -> torch.Tensor:
         """Tokenise *text* and return a 2-D ``input_ids`` tensor on the target device."""
         ids = self._tokenizer.encode(text, add_special_tokens=False)
@@ -84,7 +83,6 @@ class Small_LLM_Model:
         if isinstance(ids, torch.Tensor):
             ids = ids.tolist()
         return self._tokenizer.decode(ids, skip_special_tokens=True)
-
 
     def get_logits_from_input_ids(self, input_ids: list[int]) -> list[float]:
         """
@@ -97,7 +95,6 @@ class Small_LLM_Model:
         logits = out.logits[0, -1].tolist()
         return [float(x) for x in logits]
 
-
     def get_path_to_vocab_file(self) -> str:
         vocab_file_name = self._tokenizer.vocab_files_names.get('vocab_file', "vocab.json")
         vocab_path = hf_hub_download(
@@ -105,7 +102,6 @@ class Small_LLM_Model:
             filename=vocab_file_name
         )
         return vocab_path
-
 
     def get_path_to_merges_file(self) -> str:
         merges_file_name = self._tokenizer.vocab_files_names.get('merges_file', "merges.txt")
@@ -115,7 +111,6 @@ class Small_LLM_Model:
         )
         return merges_path
 
-
     def get_path_to_tokenizer_file(self) -> str:
         tokenizer_file_name = self._tokenizer.vocab_files_names.get('tokenizer_file', "tokenizer.json")
         tokenizer_path = hf_hub_download(
@@ -124,7 +119,7 @@ class Small_LLM_Model:
         )
         return tokenizer_path
 
-    def init_generation(self, input_ids: list[int]):
+    def init_generation(self, input_ids: list[int]) -> tuple[list[float], Any]:
         input_tensor = torch.tensor([input_ids], device=self._device, dtype=torch.long)
 
         with torch.inference_mode():
@@ -136,10 +131,9 @@ class Small_LLM_Model:
         logits = outputs.logits[0, -1].tolist()
         # next_token = int(torch.argmax(logits, dim=-1).item())
 
-        return logits, outputs.past_key_values
+        return [float(x) for x in logits], outputs.past_key_values
 
-
-    def next_token_with_cache(self, token_id: int, past_key_values):
+    def next_token_with_cache(self, token_id: int, past_key_values: Any) -> tuple[list[float], Any]:
         input_tensor = torch.tensor([[token_id]], device=self._device, dtype=torch.long)
 
         with torch.inference_mode():
@@ -152,4 +146,4 @@ class Small_LLM_Model:
         # next_token = int(torch.argmax(logits, dim=-1).item())
         logits = outputs.logits[0, -1].tolist()
 
-        return logits, outputs.past_key_values
+        return [float(x) for x in logits], outputs.past_key_values

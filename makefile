@@ -1,11 +1,12 @@
 UV          = $(HOME)/.local/bin/uv
 VENV        = .venv
-VENV_BIN    = $(VENV)/bin
+VENV_BIN    = $(VENV)/bin 
 V_PYTHON    = $(VENV_BIN)/python
 
-MAIN        = src/__main__.py
-STAMP       = $(VENV)/.install.stamp
-VENV_STAMP  = $(VENV)/.ve.stamp
+SRC_DIR		= src
+MAIN		= $(SRC_DIR)/__main__.py
+STAMP		= $(VENV)/.install.stamp
+VENV_STAMP 	= $(VENV)/.ve.stamp
 
 build: $(OUTPUT_FILE)
 
@@ -36,7 +37,15 @@ install: $(STAMP)
 
 run: $(STAMP)
 	@echo "Running LLM..."
-	$(V_PYTHON) -m src
+	uv run -m src
+
+lint: 
+	flake8 $(SRC_DIR)
+	mypy --warn-return-any --warn-unused-ignores --ignore-missing-imports --disallow-untyped-defs --check-untyped-defs
+
+lint-strict:
+	flake8 $(SRC_DIR)
+	mypy $(SRC_DIR) --strict
 
 profiler: $(STAMP)
 	-@$(V_PYTHON) -m cProfile -o profile.stats $(MAIN) config.txt "profiler"

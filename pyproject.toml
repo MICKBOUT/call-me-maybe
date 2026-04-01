@@ -47,7 +47,7 @@ pythonpath = ["src"]
 [tool.mypy]
 mypy_path = "src"
 files = ["src"]
-
 [[tool.mypy.overrides]]
-module = "mlx.*"
+module = "llm_sdk.*"
+ignore_errors = true
 ignore_missing_imports = true
