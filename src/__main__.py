@@ -23,6 +23,9 @@ class custom_llm(Small_LLM_Model):
         end_token = "<|im_end|>"
         self.end_token_id = self.encode_lst(end_token)[0]
 
+        with open(function_file, 'r') as f:
+            function_json = json.load(f)
+
         # Tree to choose the right function
         self.tree_function: TreeNode = {
             self.end_token_id:
