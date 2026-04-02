@@ -18,6 +18,7 @@ dependencies = [
     "numpy",
     "transformers>=4.40.0",
     "huggingface-hub>=0.20.0",
+    "pydantic>=2.0.0"
 ]
 
 [[tool.uv.index]]
@@ -30,7 +31,6 @@ torch = { index = "pytorch-cpu" }
 
 [project.optional-dependencies]
 dev = [
-    "snakeviz",
     "flake8",
     "mypy",
 ]
@@ -40,9 +40,6 @@ dev = [
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/mazegen"]
-
-[tool.pytest.ini_options]
-pythonpath = ["src"]
 
 [tool.mypy]
 mypy_path = "src"
@@ -56,7 +53,3 @@ module = [
 ignore_errors = true
 ignore_missing_imports = true
 
-[dependency-groups]
-dev = [
-    "snakeviz>=2.2.2",
-]
