@@ -28,6 +28,10 @@ class custom_llm(Small_LLM_Model):
             self.end_token_id:
             {"name": end_token} if display_tree else {}
         }
+
+        with open(function_file, 'r') as f:
+            function_json = json.load(f)
+
         for function in function_json:
             tokenize_function = self.encode_lst(function["name"])
             leaf: Any = self.tree_function

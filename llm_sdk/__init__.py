@@ -46,6 +46,7 @@ class Small_LLM_Model:
                 device = "cuda"
             else:
                 device = "cpu"
+        print(device)
         self._device = device
 
         if dtype is None:
