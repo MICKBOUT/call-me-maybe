@@ -12,7 +12,7 @@ class ParsingError(Exception):
         super().__init__(msg)
 
 
-def input_parcing() -> tuple[FunctionList, PromptList, str]:
+def input_parcing() -> tuple[FunctionList, PromptList, str, str]:
     parser = ArgumentParser(description="call_me_maybe")
 
     parser.add_argument(
@@ -33,6 +33,14 @@ def input_parcing() -> tuple[FunctionList, PromptList, str]:
         default="data/output/function_calling_results.json",
         help="Output path or format"
     )
+    parser.add_argument(
+        "--model_name",
+        type=str,
+        default="Qwen/Qwen3-0.6B",
+        help="model name (on Hugging Face)"
+    )
+
+
     args = parser.parse_args()
 
     try:
@@ -67,4 +75,4 @@ def input_parcing() -> tuple[FunctionList, PromptList, str]:
             print(f"Error at \"{locs}\": {msg}")
         raise ParsingError()
 
-    return function_lst, prompt_lst, args.output
+    return function_lst, prompt_lst, args.output, args.model_name

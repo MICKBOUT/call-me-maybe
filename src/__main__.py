@@ -1,4 +1,4 @@
-from typing import Optional, Any, Callable, cast
+from typing import Any, Callable, cast
 import json
 
 import numpy as np
@@ -10,16 +10,23 @@ from .tree_visualizer import build_rich_tree
 from .type_aliases import TreeNode, ConstrainedSet, TokenId
 
 
+class ModelNotFoundError(Exception):
+    def __init__(self, msg: str = "Model Not found"):
+        super().__init__(msg)
+
+
 class custom_llm(Small_LLM_Model):
     def __init__(
         self,
         function_lst: FunctionList,
+        display_tree: bool = False,
         model_name: str = "Qwen/Qwen3-0.6B",
-        display_tree: Optional[bool] = False,
     ) -> None:
-        super().__init__(
-            model_name,
-        )
+        try:
+            super().__init__(model_name)
+        except OSError:
+            raise ModelNotFoundError()
+
         back_n = "\n"
         self.back_n_id = self.encode_lst(back_n)[0]
         end_token = "<|im_end|>"
@@ -44,6 +51,16 @@ class custom_llm(Small_LLM_Model):
         if display_tree:
             build_rich_tree(self.tree_function)
 
+        # create a dict w/ key: value (fn_name: fn_data)
+        self.function_dict = {
+            function.name: function
+            for function in function_lst.functions}
+
+        self.functions_description = "function list:"
+        for function in function_lst.functions:
+            self.functions_description += f"name: '{function.name}'\n"
+            self.functions_description += f"description: '{function.description}'\n\n"
+
         # CONSTRAINED_SET
         self.integer_constrained = {
             self.encode_lst(ell)[0] for ell in
@@ -56,25 +73,20 @@ class custom_llm(Small_LLM_Model):
             self.encode_lst(ell)[0] for ell in
             {"True", "False", "\n"}}
 
-        # create a dict w/ key: value (fn_name: fn_data)
-        self.function_dict = {
-            function.name: function
-            for function in function_lst.functions}
-
     def encode_lst(self, text: str) -> list[TokenId]:
         return cast(list[TokenId], self.encode(text).tolist()[0])
 
     def find_fn(self, prompt: str) -> str:
         formated_prompt = (
-           "<|im_start|>system\n"
-           "You are a function selector. Given a user request, "
-           "respond with ONLY the name of the most appropriate "
-           "function to call. No explanation, no arguments, "
-           "just the function name.<|im_end|>\n"
-           "<|im_start|>user\n"
-           f"{prompt}<|im_end|>\n"
-           "<|im_start|>assistant\n"
-           "<think>\n\n</think>\n"
+            f"{self.functions_description}"
+            "<|im_start|>system\n"
+            "Your task is to use the function call to "
+            "archived the task ask in the following prompt. "
+            "(raw data / no mistake)\n"
+            f"prompte = {prompt}\n<|im_end|>\n"
+            "<|im_start|>assistant\n"
+            f"function:\n"
+            "  fn_name ="
         )
 
         answer = []
@@ -186,14 +198,19 @@ class custom_llm(Small_LLM_Model):
 
 def main() -> None:
     try:
-        function_lst, prompt_lst, output_file = input_parcing()
+        function_lst, prompt_lst, output_file, model_name = input_parcing()
     except ParsingError:
         return
 
-    llm = custom_llm(
-        function_lst=function_lst,
-        display_tree=False
-    )
+    try:
+        llm = custom_llm(
+            function_lst=function_lst,
+            display_tree=False,
+            model_name=model_name
+        )
+    except ModelNotFoundError as e:
+        print(f"Error: Model '{model_name}' not found")
+        return
 
     result = []
     print()
