@@ -8,11 +8,40 @@ from .data_validation import FunctionList, PromptList
 
 
 class ParsingError(Exception):
+    """Exception raised when an error occurs during data parsing.
+
+    Args:
+        msg (str): The error message to display.
+        Defaults to "An error occurred while loading data".
+    """
     def __init__(self, msg: str = "An error occurred while loading data"):
         super().__init__(msg)
 
 
 def input_parcing() -> tuple[FunctionList, PromptList, str, str]:
+    """Parses command-line arguments and loads/validates function/promptdata.
+
+    This function sets up an argument parser to handle input paths for
+    functions definition, input data, output path, and model name. It loads
+    JSON data from the specified files, validates them against Pydantic models,
+    and returns the validated objects along with output and model name
+    arguments.
+
+    Args:
+        None (arguments are parsed from command line).
+
+    Returns:
+        tuple[FunctionList, PromptList, str, str]: A tuple containing:
+            - function_lst (FunctionList): Validated list of function
+            definitions.
+            - prompt_lst (PromptList): Validated list of prompts.
+            - output (str): Path or format for output.
+            - model_name (str): Name of the model (e.g., from Hugging Face).
+
+    Raises:
+        ParsingError: If there is an error loading or validating the JSON
+            files.
+    """
     parser = ArgumentParser(description="call_me_maybe")
 
     parser.add_argument(
