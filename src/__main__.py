@@ -1,4 +1,4 @@
-from typing import Any, Callable, cast
+from typing import Any, cast
 import json
 
 import numpy as np
@@ -7,7 +7,7 @@ from llm_sdk import Small_LLM_Model
 from .data_validation import FunctionList, AllowedType
 from .parcing import input_parcing, ParsingError
 from .tree_visualizer import build_rich_tree
-from .type_aliases import TreeNode, ConstrainedSet, TokenId
+from .type_aliases import TreeNode, TokenId
 
 
 class ModelNotFoundError(Exception):
@@ -110,33 +110,49 @@ class custom_llm(Small_LLM_Model):
         return self.decode(answer)
 
     def find_args(self, prompt: str, fn_name: str) -> dict[str, Any]:
-        def constrian_type(
-          prompte: str,
-          constrained_set: ConstrainedSet,
-          arg_type: Callable[[str], Any]
-        ) -> Any:
-            arg = []
-            input_ids = self.encode_lst(prompte)
+        def generate_arg_constrian(prompte, constrained_set, arg_type):
+            arg, input_ids = [], self.encode_lst(prompte)
             logits, past = self.init_generation(input_ids)
             while True:
-                next_token = max(
-                    (k for k in constrained_set),
-                    key=lambda t: logits[t],
-                    default=self.end_token_id
-                )
-
+                next_token = max(constrained_set, key=lambda t: logits[t], default=self.end_token_id)
                 if next_token == self.back_n_id:
                     break
                 arg.append(next_token)
+                logits, past = self.next_token_with_cache(next_token, past)
+            return arg_type(self.decode(arg))
+
+        def generate_arg_free(prompt: str) -> str:
+            input_ids = self.encode_lst(formated_prompt)
+            logits, past = self.init_generation(input_ids)
+            next_token = int(np.argmax(logits))
+            value = ""
+
+            next_token_value = self.decode(next_token)
+            while "\n" not in next_token_value:
+                value += next_token_value
 
                 logits, past = self.next_token_with_cache(next_token, past)
-            value = arg_type(self.decode(arg))
+                next_token = int(np.argmax(logits))
+                next_token_value = self.decode(next_token)
+
+            for c in next_token_value:
+                if c == "\n":
+                    break
+                value += c
+            value = value.lstrip()
+            if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
+                value = value[1:-1]
             return value
 
-        fn_data = self.function_dict[fn_name]
-        args = {}
+        CONSTRAINED = {
+            AllowedType.FLOAT: (self.number_constrained, float),
+            AllowedType.INT:   (self.integer_constrained, int),
+            AllowedType.BOOL:  (self.boolean_constrained, bool),
+        }
 
-        extracted = ""
+        fn_data = self.function_dict[fn_name]
+        args, extracted = {}, ""
+
         for arg_name, arg_data in fn_data.parameters.items():
             formated_prompt = (
                 "<|im_start|>system\n"
@@ -153,41 +169,11 @@ class custom_llm(Small_LLM_Model):
                 f"  {arg_name}: {arg_data.type.value} ="
             )
 
-            if arg_data.type == AllowedType.FLOAT:
-                value = constrian_type(
-                    formated_prompt, self.number_constrained, float)
-            elif arg_data.type == AllowedType.INT:
-                value = constrian_type(
-                    formated_prompt, self.integer_constrained, int)
-            elif arg_data.type == AllowedType.BOOL:
-                value = constrian_type(
-                    formated_prompt, self.boolean_constrained, bool)
+            if arg_data.type in CONSTRAINED:
+                cset, cast = CONSTRAINED[arg_data.type]
+                value = generate_arg_constrian(formated_prompt, cset, cast)
             else:
-                input_ids = self.encode_lst(formated_prompt)
-                logits, past = self.init_generation(input_ids)
-                next_token = int(np.argmax(logits))
-                value = ""
-
-                next_token_value = self.decode(next_token)
-                while "\n" not in next_token_value:
-                    value += next_token_value
-
-                    logits, past = self.next_token_with_cache(next_token, past)
-                    next_token = int(np.argmax(logits))
-                    next_token_value = self.decode(next_token)
-
-                for c in next_token_value:
-                    if c == "\n":
-                        break
-                    value += c
-                try:
-                    value = value.lstrip()
-                    if value[0] == "'" == value[-1] == "'":
-                        value = value[1:-1]
-                    elif value[0] == '"' == value[-1] == '"':
-                        value = value[1:-1]
-                except Exception:
-                    pass
+                value = generate_arg_free(formated_prompt)
 
             extracted += f"  {arg_name}: {arg_data.type.value} = {value}\n"
             args[arg_name] = value
