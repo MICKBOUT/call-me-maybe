@@ -21,6 +21,27 @@ class ModelError(Exception):
         super().__init__(msg)
 
 
+def parse_bool(value: str) -> bool:
+    """
+    Convert a generated boolean string into a Python bool.
+
+    Args:
+        value (str): Raw decoded boolean value.
+
+    Returns:
+        bool: Parsed boolean.
+
+    Raises:
+        ValueError: If the decoded value is not a supported boolean literal.
+    """
+    cleaned = value.strip()
+    if cleaned == "True":
+        return True
+    if cleaned == "False":
+        return False
+    raise ValueError(f"Invalid boolean value: {value!r}")
+
+
 class custom_llm(Small_LLM_Model):
     def __init__(
         self,
@@ -232,10 +253,13 @@ class custom_llm(Small_LLM_Model):
                 value = value[1:-1]
             return value
 
-        CONSTRAINED = {
+        CONSTRAINED: dict[
+            AllowedType,
+            tuple[ConstrainedSet, Callable[[str], Any]]
+        ] = {
             AllowedType.FLOAT: (self.number_constrained, float),
             AllowedType.INT:   (self.integer_constrained, int),
-            AllowedType.BOOL:  (self.boolean_constrained, bool),
+            AllowedType.BOOL:  (self.boolean_constrained, parse_bool),
         }
 
         fn_data = self.function_dict[fn_name]

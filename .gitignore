@@ -1,6 +1,6 @@
 __pycache__/
 
-# Environments
+
 .env
 .envrc
 .venv
@@ -9,3 +9,5 @@ env/
 venv/
 ENV/
 build_venv/
+data/output/*
+!data/output/.gitkeep
