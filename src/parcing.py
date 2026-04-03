@@ -40,7 +40,6 @@ def input_parcing() -> tuple[FunctionList, PromptList, str, str]:
         help="model name (on Hugging Face)"
     )
 
-
     args = parser.parse_args()
 
     try:

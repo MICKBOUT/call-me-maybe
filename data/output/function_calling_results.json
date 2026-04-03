@@ -19,7 +19,7 @@
         "prompt": "Greet shrek",
         "name": "fn_greet",
         "parameters": {
-            "name": "Shrek"
+            "name": "shrek"
         }
     },
     {
@@ -62,8 +62,8 @@
         "name": "fn_substitute_string_with_regex",
         "parameters": {
             "source_string": "Hello 34 I'm 233 years old",
-            "regex": "r'(\\d+)' ",
-            "replacement": "number"
+            "regex": "(\\d+)",
+            "replacement": "NUMBERS"
         }
     },
     {
@@ -71,7 +71,7 @@
         "name": "fn_substitute_string_with_regex",
         "parameters": {
             "source_string": "Programming is fun",
-            "regex": "([aeiouAEIOU])",
+            "regex": "[aeiou]",
             "replacement": "*"
         }
     },
@@ -79,8 +79,8 @@
         "prompt": "Substitute the word 'cat' with 'dog' in 'The cat sat on the mat with another cat'",
         "name": "fn_substitute_string_with_regex",
         "parameters": {
-            "source_string": "prompte",
-            "regex": "r'cat'",
+            "source_string": "The cat sat on the mat with another cat",
+            "regex": "cat",
             "replacement": "dog"
         }
     }

@@ -1,4 +1,4 @@
-from typing import Any, cast
+from typing import Any, cast, Callable
 import json
 
 import numpy as np
@@ -7,7 +7,7 @@ from llm_sdk import Small_LLM_Model
 from .data_validation import FunctionList, AllowedType
 from .parcing import input_parcing, ParsingError
 from .tree_visualizer import build_rich_tree
-from .type_aliases import TreeNode, TokenId
+from .type_aliases import TreeNode, TokenId, ConstrainedSet
 
 
 class ModelNotFoundError(Exception):
@@ -26,6 +26,7 @@ class custom_llm(Small_LLM_Model):
             super().__init__(model_name)
         except OSError:
             raise ModelNotFoundError()
+        print(f"model used: {model_name}")
 
         back_n = "\n"
         self.back_n_id = self.encode_lst(back_n)[0]
@@ -56,10 +57,10 @@ class custom_llm(Small_LLM_Model):
             function.name: function
             for function in function_lst.functions}
 
-        self.functions_description = "function list:"
+        self.fn_lst_str = "function list:"
         for function in function_lst.functions:
-            self.functions_description += f"name: '{function.name}'\n"
-            self.functions_description += f"description: '{function.description}'\n\n"
+            self.fn_lst_str += f"name: '{function.name}'\n"
+            self.fn_lst_str += f"description: '{function.description}'\n\n"
 
         # CONSTRAINED_SET
         self.integer_constrained = {
@@ -78,7 +79,7 @@ class custom_llm(Small_LLM_Model):
 
     def find_fn(self, prompt: str) -> str:
         formated_prompt = (
-            f"{self.functions_description}"
+            f"{self.fn_lst_str}"
             "<|im_start|>system\n"
             "Your task is to use the function call to "
             "archived the task ask in the following prompt. "
@@ -110,11 +111,18 @@ class custom_llm(Small_LLM_Model):
         return self.decode(answer)
 
     def find_args(self, prompt: str, fn_name: str) -> dict[str, Any]:
-        def generate_arg_constrian(prompte, constrained_set, arg_type):
+        def generate_arg_constrian(
+          prompte: str,
+          constrained_set: ConstrainedSet,
+          arg_type: Callable[[str], Any]) -> Any:
             arg, input_ids = [], self.encode_lst(prompte)
             logits, past = self.init_generation(input_ids)
             while True:
-                next_token = max(constrained_set, key=lambda t: logits[t], default=self.end_token_id)
+                next_token = max(
+                    constrained_set,
+                    key=lambda t: logits[t],
+                    default=self.end_token_id
+                )
                 if next_token == self.back_n_id:
                     break
                 arg.append(next_token)
@@ -140,7 +148,8 @@ class custom_llm(Small_LLM_Model):
                     break
                 value += c
             value = value.lstrip()
-            if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
+            if len(value) >= 2 and value[0] == value[-1] and value[0] in {
+              "'", '"'}:
                 value = value[1:-1]
             return value
 
@@ -194,7 +203,7 @@ def main() -> None:
             display_tree=False,
             model_name=model_name
         )
-    except ModelNotFoundError as e:
+    except ModelNotFoundError:
         print(f"Error: Model '{model_name}' not found")
         return
 
