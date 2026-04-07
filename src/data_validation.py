@@ -51,7 +51,7 @@ class FunctionList(BaseModel):
             instances.
     """
     model_config = ConfigDict(extra="forbid")
-    functions: list[FunctionItem]
+    functions: list[FunctionItem] = Field(min_length=1)
 
 
 class PromptItem(BaseModel):
@@ -73,4 +73,4 @@ class PromptList(BaseModel):
         prompts (list[PromptItem]): A list containing PromptItem instances.
     """
     model_config = ConfigDict(extra="forbid")
-    prompts: list[PromptItem]
+    prompts: list[PromptItem] = Field(min_length=1)
