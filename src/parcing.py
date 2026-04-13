@@ -91,7 +91,7 @@ def input_parcing() -> tuple[FunctionList, PromptList, str, str]:
         with open(args.input, 'r') as f:
             prompt_lst = json.load(f)
     except Exception:
-        print("Error will loading the prompte")
+        print("Error will loading the prompt")
         raise ParsingError
     try:
         prompt_lst = PromptList.model_validate({"prompts": prompt_lst})

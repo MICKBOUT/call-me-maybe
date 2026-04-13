@@ -74,11 +74,7 @@ class custom_llm(Small_LLM_Model):
         end_token = "<|im_end|>"
         self.end_token_id = self.encode_lst(end_token)[0]
 
-        # Tree to choose the right function
         self.tree_function: TreeNode = {}
-        #     self.end_token_id:
-        #     {"name": end_token} if display_tree else {}
-        # }
         for function in function_lst.functions:
             tokenize_function = self.encode_lst(function.name)
             leaf: Any = self.tree_function
@@ -89,8 +85,7 @@ class custom_llm(Small_LLM_Model):
                 leaf = leaf[token]
             leaf[self.end_token_id] = {"name": end_token
                                        } if display_tree else {}
-        # code to visulise the tree
-        if display_tree:
+        if display_tree:  # code to visulise the tree
             build_rich_tree(self.tree_function)
 
         # create a dict w/ key: value (fn_name: fn_data)
@@ -143,7 +138,7 @@ class custom_llm(Small_LLM_Model):
             "Your task is to use the function call to "
             "archived the task ask in the following prompt. "
             # "(raw data / no mistake)\n"
-            f"prompte = {prompt}\n<|im_end|>\n"
+            f"prompt = {prompt}\n<|im_end|>\n"
             "<|im_start|>assistant\n"
             f"function:\n"
             "  fn_name ="
@@ -181,7 +176,7 @@ class custom_llm(Small_LLM_Model):
             dict[str, Any]: The arguments for the function.
         """
         def generate_arg_constrian(
-            prompte: str,
+            prompt: str,
             constrained_set: ConstrainedSet,
             arg_type: Callable[[str], Any]
           ) -> Any:
@@ -189,7 +184,7 @@ class custom_llm(Small_LLM_Model):
             Generates an argument based on the prompt and constrained set.
 
             Args:
-                prompte (str): The prompt for argument generation.
+                prompt (str): The prompt for argument generation.
                 constrained_set (ConstrainedSet): The set of allowed tokens.
                 arg_type (Callable[[str], Any]): The type to cast the generated
                     argument to.
@@ -198,7 +193,7 @@ class custom_llm(Small_LLM_Model):
                 Any: The generated argument.
             """
             arg: list[TokenId] = []
-            input_ids = self.encode_lst(prompte)
+            input_ids = self.encode_lst(prompt)
             logits, past = self.init_generation(input_ids)
             while True:
                 next_token = max(
@@ -268,12 +263,11 @@ class custom_llm(Small_LLM_Model):
         for arg_name, arg_data in fn_data.parameters.items():
             formated_prompt = (
                 "<|im_start|>system\n"
-                "Your task is to use the function call to "
-                "archived the task ask in the following prompt. "
-                "(raw data / no mistake)\n"
-                f"prompte = {prompt}\n<|im_end|>\n"
+                "Your need to archived the following task ask w/ a function the right function call"
+                f"prompt = {prompt}\n"
+                "<|im_end|>\n"
                 "<|im_start|>assistant\n"
-                f"function:\n"
+                "function:\n"
                 f"  fn_name = {fn_name}\n"
                 # f"  Description = {fn_data["description"]}\n"
                 "args:\n"

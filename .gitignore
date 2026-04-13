@@ -11,3 +11,4 @@ ENV/
 build_venv/
 data/output/*
 !data/output/.gitkeep
+moulinette/*
