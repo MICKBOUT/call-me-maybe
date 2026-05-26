@@ -14,19 +14,22 @@ classifiers = [
 ]
 
 dependencies = [
-    "torch",
+    "torch==2.6.0+cpu",
     "numpy",
     "transformers>=4.51.0",
     "huggingface-hub>=0.20.0",
     "pydantic>=2.0.0",
     "flake8",
     "mypy",
-    "accelerate>=1.13.0",
 ]
 
-[tool.uv]
-cache-dir = "~/goinfre/.cache"
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
 
+[tool.uv.sources]
+torch = { index = "pytorch-cpu" }
 
 [project.urls]
 "Homepage" = "https://projects.intra.42.fr/a-maze-ing/mboutte"
